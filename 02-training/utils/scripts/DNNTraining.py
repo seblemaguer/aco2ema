@@ -364,7 +364,7 @@ def main(_):
 
     if args.variance is None:
         stddev = numpy.ones(
-            config['num_output_dimensions'], dtype=numpy.float32)
+            config['num_output_units'], dtype=numpy.float32)
     else:
         variance = DNNDataIO.read_data(args.variance)
         stddev = numpy.sqrt(variance)

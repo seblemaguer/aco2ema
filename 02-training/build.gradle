@@ -1,0 +1,106 @@
+plugins {
+    id 'distribution'
+    id 'maven-publish'
+    id "groovy"
+}
+
+repositories {
+    ['cloudark', 'localhost'].each { hostname ->
+        maven {
+            url "http://$hostname:8081/artifactory/local"
+            credentials {
+                username = findProperty('cloudarkUser')
+                password = findProperty('cloudarkApiKey')
+            }
+        }
+    }
+}
+
+
+ext {
+    config_file = new File("../src/configuration/" + System.getProperty("eval_name") + ".json")
+    dataset_root = "../01-extraction/build"
+}
+
+import groovy.json.* // To load the JSON configuration file
+import java.util.*
+import de.dfki.mary.htspacking.*
+
+
+def slurper = new JsonSlurper()
+def config = slurper.parseText( config_file.text )
+
+task generateSCP {
+    println(projectDir)
+    ext.output_f = new File("$buildDir/train.scp")
+    outputs.files ext.output_f
+    doLast {
+        (new File(config.data.list_training)).eachLine{ basename ->
+            ext.output_f << "$projectDir/$dataset_root/ffi/${basename}.ffi $projectDir/$dataset_root/ffo/${basename}.ffo\n"
+        }
+    }
+}
+
+
+task generateCFG {
+    ext.output_f = new File("$buildDir/train_dnn.cfg")
+    outputs.files ext.output_f
+    doLast {
+
+        def in_vec_size = 0
+        config.models.ffi.streams.each { stream ->
+            in_vec_size += (stream.order + 1) * stream.winfiles.size()
+        }
+
+
+        def out_vec_size = 0
+        config.models.ffo.streams.each { stream ->
+            out_vec_size += (stream.order + 1) * stream.winfiles.size()
+        }
+
+        // Now adapt the proto template
+        def binding = [
+        num_input_units: in_vec_size,
+        num_hidden_units: "[1024, 1024, 1024]",
+        num_output_units: out_vec_size,
+
+        hidden_activation: "Sigmoid",
+        output_activation: "Linear",
+        optimizer: "Adam",
+        learning_rate: 0.001,
+        keep_prob: 0.5,
+
+        use_queue: 0,
+        queue_size: 5000,
+
+        batch_size: 256,
+        num_epochs: 50,
+        num_threads: 0,
+        random_seed: 12345,
+
+        num_models_to_keep: 5,
+
+        log_interval: 100,
+        save_interval: 5000
+        ]
+
+        // Copy
+        project.copy {
+            from "utils/templates"
+            into "$buildDir/"
+
+            include "train_dnn.cfg"
+
+            expand(binding)
+        }
+    }
+}
+
+task train {
+    dependsOn "generateCFG", "generateSCP"
+    doLast {
+        exec {
+            commandLine "python3", "-u", "-B", "utils/scripts/DNNTraining.py", "-C", project.generateCFG.output_f, "-S", project.generateSCP.output_f, "-H", "$buildDir/models" // FIXME: quid of "-z ${project.tasks.computeVAR.output}/global.var"
+        }
+    }
+}

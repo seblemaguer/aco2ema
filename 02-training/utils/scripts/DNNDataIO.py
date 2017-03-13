@@ -47,7 +47,7 @@ import numpy
 import os
 import re
 import struct
-import ConfigParser
+from configparser import SafeConfigParser as ConfigParser
 
 from six.moves import xrange
 import tensorflow as tf
@@ -177,12 +177,12 @@ def read_data_from_script(
             input_filename, output_filename = filenames.split(' ', 1)
             with open(input_filename.rstrip(), 'rb') as f:
                 packed_data = f.read(4)
-                while packed_data != '':
+                while len(packed_data) != 0:
                     input_data.extend(struct.unpack('f', packed_data))
                     packed_data = f.read(4)
             with open(output_filename.rstrip(), 'rb') as f:
                 packed_data = f.read(4)
-                while packed_data != '':
+                while len(packed_data) != 0:
                     output_data.extend(struct.unpack('f', packed_data))
                     packed_data = f.read(4)
 
@@ -256,7 +256,7 @@ def write_data(filename, data, append=False):
 
 
 def load_config(config_file, verbose=True):
-    config_parser = ConfigParser.SafeConfigParser()
+    config_parser = ConfigParser()
     config_parser.read(config_file)
 
     config = {}
