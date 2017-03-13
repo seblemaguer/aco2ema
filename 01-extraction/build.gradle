@@ -18,10 +18,10 @@ repositories {
 
 ext {
     dataSets = [
-    'straight': 'mngu0_straight-analysis',
-    'ema_tongue': 'mngu0_ema_tongue-analysis',
-    'weights': 'mngu0_weights-analysis',
-    'ema': 'mngu0_ema-analysis'
+    'straight': 'mngu0_straight_dnn',
+    'ema_tongue': 'mngu0_ema_tongue',
+    'weights': 'mngu0_weights',
+    'ema': 'mngu0_ema'
     ]
     dataVersion = '0.1-SNAPSHOT' // FIXME: to change !
 }
@@ -36,19 +36,153 @@ sourceSets {
 
 dependencies {
     data group: 'org.m2ci.msp', name: dataSets["straight"], version: dataVersion, ext: 'zip', changing: true
-    data group: 'org.m2ci.msp', name: dataSets["$eval_name"], version: dataVersion, ext: 'zip', changing: true
+    data group: 'org.m2ci.msp', name: dataSets[System.getProperty("eval_name")], version: dataVersion, ext: 'zip', changing: true
 }
 
-processDataResources {
-    from configurations.data, {
-        filesMatching '*.zip', { zipFileDetails ->
-            logger.info "unzipping $zipFileDetails.file"
-            copy {
-                from zipTree(zipFileDetails.file)
-                into destinationDir
-                includeEmptyDirs = false
+ext {
+    config_file = new File("../src/configuration/" + System.getProperty("eval_name") + ".json")
+    dataset_root = "$buildDir/dataset/"
+}
+
+import groovy.json.* // To load the JSON configuration file
+import java.util.*
+import de.dfki.mary.htspacking.*
+
+
+def slurper = new JsonSlurper()
+def config = slurper.parseText( config_file.text )
+
+task extractDataArchive {
+    def datasetDir = file(dataset_root)
+    outputs.files datasetDir
+
+    doLast {
+        copy {
+            from configurations.data.collect { zipTree(it) }
+            into datasetDir
+            eachFile {
+                def newPath = it.relativePath.segments[1..-1].join("/")
+                it.relativePath = RelativePath.parse(true, newPath)
             }
-            zipFileDetails.exclude()
         }
+    }
+}
+
+/* Generate the training observation files */
+(new File(config.data.list_training)).eachLine{ basename ->
+    project(":$basename") {
+        buildDir = project.parent.buildDir
+        apply plugin: "de.dfki.mary.htspacking"
+
+
+        task configure(dependsOn: project.rootProject.extractDataArchive) {
+
+            if (project.user_configuration.models.ffi) {
+                project.user_configuration.models.ffi.streams.each { stream ->
+                    stream.coeffDir = "$dataset_root/${stream.coeffDir}"
+                }
+            }
+
+            if (project.user_configuration.models.ffo) {
+                project.user_configuration.models.ffo.streams.each { stream ->
+                    stream.coeffDir = "$dataset_root/${stream.coeffDir}"
+                }
+            }
+        }
+
+
+        prepareEnvironment.dependsOn configure
+
+        /**
+         * FFI generation task
+         */
+        project.task('generateFFI') {
+            dependsOn prepareEnvironment
+            (new File("$project.buildDir/ffi")).mkdirs()
+            outputs.files "$project.buildDir/ffi" + project.basename + ".ffi"
+
+
+            doLast {
+                def extToDir = new Hashtable<String, String>()
+                extToDir.put("ffi".toString(), "$project.buildDir/ffi".toString())
+
+                project.user_configuration.models.ffi.streams.each  { stream ->
+                    def kind = stream.kind
+                    extToDir.put(kind.toLowerCase().toString(), stream.coeffDir.toString())
+                }
+
+                def extractor = new ExtractFFI(config_file.toString())
+                extractor.setDirectories(extToDir)
+                extractor.extract("$project.basename")
+            }
+        }
+    }
+}
+
+/* Generate the test part */
+(new File(config.data.list_test)).eachLine{ basename ->
+    project(":$basename") {
+        buildDir = project.parent.buildDir
+        apply plugin: "de.dfki.mary.htspacking"
+
+
+
+        task configure(dependsOn: project.rootProject.extractDataArchive) {
+
+            if (project.user_configuration.models.ffi) {
+                project.user_configuration.models.ffi.streams.each { stream ->
+                    stream.coeffDir = "$dataset_root/${stream.coeffDir}"
+                }
+            }
+
+            if (project.user_configuration.models.ffo) {
+                project.user_configuration.models.ffo.streams.each { stream ->
+                    stream.coeffDir = "$dataset_root/${stream.coeffDir}"
+                }
+            }
+        }
+
+
+        prepareEnvironment.dependsOn configure
+
+
+        /**
+         * FFI generation task
+         */
+        project.task('generateFFI') {
+            dependsOn prepareEnvironment
+            (new File("$project.buildDir/ffi")).mkdirs()
+            outputs.files "$project.buildDir/ffi" + project.basename + ".ffi"
+
+
+            doLast {
+
+                def extToDir = new Hashtable<String, String>()
+                extToDir.put("ffi".toString(), "$project.buildDir/ffi".toString())
+
+                project.user_configuration.models.ffi.streams.each  { stream ->
+                    def kind = stream.kind
+                    extToDir.put(kind.toLowerCase().toString(), stream.coeffDir.toString())
+                }
+
+                def extractor = new ExtractFFI(config_file.toString())
+                extractor.setDirectories(extToDir)
+                extractor.extract("$project.basename")
+            }
+        }
+    }
+}
+
+
+
+task prepareData() {
+    (new File(config.data.list_training)).eachLine{ basename ->
+        dependsOn ":${basename}:pack"
+        dependsOn ":${basename}:generateFFI"
+    }
+
+    (new File(config.data.list_test)).eachLine{ basename ->
+        dependsOn ":${basename}:pack"
+        dependsOn ":${basename}:generateFFI"
     }
 }

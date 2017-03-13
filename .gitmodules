@@ -1,0 +1,3 @@
+[submodule "01-extraction/buildSrc/gradle-hts-coefficients-packing-plugin"]
+	path = 01-extraction/buildSrc/gradle-hts-coefficients-packing-plugin
+	url = git@github.com:seblemaguer/gradle-hts-coefficients-packing-plugin.git

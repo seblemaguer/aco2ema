@@ -1,0 +1,2 @@
+include 'gradle-hts-voicebuilding-plugin'
+include 'gradle-hts-coefficients-packing-plugin'
