@@ -1,0 +1,81 @@
+{
+    "models": {
+        "ffi": {
+            "streams": [
+                {
+                    "coeffDir": "mgc",
+                    "winfiles": [
+                        "win/mgc.win1",
+                        "win/mgc.win2",
+                        "win/mgc.win3"],
+                    "order": 49,
+                    "stats": true,
+                    "kind": "mgc",
+                    "name": "mgc"
+                },
+                {
+                    "coeffDir": "vuv",
+                    "winfiles": ["win/lf0.win1"],
+                    "order": 0,
+                    "stats": false,
+                    "kind": "vuv",
+                    "name": "vuv"
+                },
+                {
+                    "coeffDir": "bap",
+                    "winfiles": [
+                        "win/bap.win1",
+                        "win/bap.win2",
+                        "win/bap.win3"],
+                    "order": 24,
+                    "stats": true,
+                    "kind": "bap",
+                    "name": "bap"
+                }
+            ]
+        },
+        "ffo": {
+            "streams": [
+                {
+                    "coeffDir": "ema",
+                    "winfiles": [
+                        "win/mgc.win1",
+                        "win/mgc.win2",
+                        "win/mgc.win3"],
+                    "order": 20,
+		            "stats": true,
+                    "kind": "ema",
+                    "name": "ema"
+                }
+            ]
+        },
+    },
+    "settings": {
+        "synthesis": {
+            "generator": "dnn",
+            "renderer": "ema"
+        },
+        "dnn": {
+            "qconf": "questions/en_US.talk.conf",
+            "num_hidden_units": "[1024, 1024, 1024]",
+            "hidden_activation": "Sigmoid",
+            "optimizer": "Adam",
+            "learning_rate": 0.001,
+            "keep_prob": 0.5,
+            "use_queue": 0,
+            "queue_size": 5000,
+            "batch_size": 256,
+            "num_epochs": 50,
+            "num_threads": 0,
+            "random_seed": 12345,
+            "num_models_to_keep": 5,
+            "log_interval": 100,
+            "save_interval": 5000
+        }
+    },
+    "data": {
+        "project_dir": ".",
+        "list_training": "../src/mngu0/list_training",
+        "list_test": "../src/mngu0/list_test"
+    }
+}
