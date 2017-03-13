@@ -1,0 +1,54 @@
+plugins {
+    id 'distribution'
+    id 'maven-publish'
+    id "groovy"
+}
+
+repositories {
+    ['cloudark', 'localhost'].each { hostname ->
+        maven {
+            url "http://$hostname:8081/artifactory/local"
+            credentials {
+                username = findProperty('cloudarkUser')
+                password = findProperty('cloudarkApiKey')
+            }
+        }
+    }
+}
+
+ext {
+    dataSets = [
+    'straight': 'mngu0_straight-analysis',
+    'ema_tongue': 'mngu0_ema_tongue-analysis',
+    'weights': 'mngu0_weights-analysis',
+    'ema': 'mngu0_ema-analysis'
+    ]
+    dataVersion = '0.1-SNAPSHOT' // FIXME: to change !
+}
+
+configurations {
+    data
+}
+
+sourceSets {
+    data
+}
+
+dependencies {
+    data group: 'org.m2ci.msp', name: dataSets["straight"], version: dataVersion, ext: 'zip', changing: true
+    data group: 'org.m2ci.msp', name: dataSets["$eval_name"], version: dataVersion, ext: 'zip', changing: true
+}
+
+processDataResources {
+    from configurations.data, {
+        filesMatching '*.zip', { zipFileDetails ->
+            logger.info "unzipping $zipFileDetails.file"
+            copy {
+                from zipTree(zipFileDetails.file)
+                into destinationDir
+                includeEmptyDirs = false
+            }
+            zipFileDetails.exclude()
+        }
+    }
+}
