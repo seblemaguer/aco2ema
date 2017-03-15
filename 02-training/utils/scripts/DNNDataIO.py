@@ -174,17 +174,31 @@ def read_data_from_script(
         input_data = []
         output_data = []
         for filenames in open(script_file, 'r'):
+            tmp_in = []
+            tmp_out = []
             input_filename, output_filename = filenames.split(' ', 1)
             with open(input_filename.rstrip(), 'rb') as f:
                 packed_data = f.read(4)
                 while len(packed_data) != 0:
-                    input_data.extend(struct.unpack('f', packed_data))
+                    tmp_in.extend(struct.unpack('f', packed_data))
                     packed_data = f.read(4)
+
             with open(output_filename.rstrip(), 'rb') as f:
                 packed_data = f.read(4)
                 while len(packed_data) != 0:
-                    output_data.extend(struct.unpack('f', packed_data))
+                    tmp_out.extend(struct.unpack('f', packed_data))
                     packed_data = f.read(4)
+
+            #  FIXME: that sucks but ja, harcoded !!!!!
+            dim_in = 226
+            dim_out = 63
+            nb_frames = int(min(int(len(tmp_in)/dim_in), int(len(tmp_out)/dim_out)))
+            for i in range(nb_frames):
+                for j in range(dim_in):
+                    input_data.append(tmp_in[i*dim_in+j])
+
+                for j in range(dim_out):
+                    output_data.append(tmp_out[i*dim_out+j])
 
         num_input_dimensions, num_output_dimensions = num_dimensions
         inputs = numpy.reshape(input_data, [-1, num_input_dimensions])
